@@ -1,10 +1,14 @@
 import { db } from '../models/index.js';
 import { logger } from '../config/logger.js';
 
+const gradeModel = db.grade;
+
 const create = async (req, res) => {
   try {
+    const grade = new gradeModel(req.body);
+    await grade.save();
     res.send({ message: 'Grade inserido com sucesso' });
-    logger.info(`POST /grade - ${JSON.stringify()}`);
+    logger.info(`POST /grade - ${JSON.stringify(grade)}`);
   } catch (error) {
     res
       .status(500)
@@ -16,13 +20,22 @@ const create = async (req, res) => {
 const findAll = async (req, res) => {
   const name = req.query.name;
 
-  //condicao para o filtro no findAll
-  var condition = name
-    ? { name: { $regex: new RegExp(name), $options: 'i' } }
-    : {};
+  if (!!name) {
+    //condicao para o filtro no findAll
+    var condition = name
+      ? { name: { $regex: new RegExp(name), $options: 'i' } }
+      : {};
+  }
 
   try {
-    logger.info(`GET /grade`);
+    let grades = [];
+    if (!!condition) {
+      grades = await gradeModel.find(condition);
+    } else {
+      grades = await gradeModel.find();
+    }
+
+    res.send(grades);
   } catch (error) {
     res
       .status(500)
@@ -35,7 +48,8 @@ const findOne = async (req, res) => {
   const id = req.params.id;
 
   try {
-    logger.info(`GET /grade - ${id}`);
+    const grade = await gradeModel.findOne({ _id: id });
+    res.send(grade);
   } catch (error) {
     res.status(500).send({ message: 'Erro ao buscar o Grade id: ' + id });
     logger.error(`GET /grade - ${JSON.stringify(error.message)}`);
@@ -52,7 +66,18 @@ const update = async (req, res) => {
   const id = req.params.id;
 
   try {
-    logger.info(`PUT /grade - ${id} - ${JSON.stringify(req.body)}`);
+    const grade = await gradeModel.findByIdAndUpdate({ _id: id }, req.body);
+    let msg = '';
+    let status = 200;
+
+    if (!!grade) {
+      logger.info(`PUT /grade - ${id} - ${JSON.stringify(grade)}`);
+      msg = `Dados atualizados-${id} - ${JSON.stringify(req.body)} `;
+    } else {
+      status = 404;
+      msg = `Dados atualizados nao encontrado-${id} `;
+    }
+    res.status(status).send({ message: msg });
   } catch (error) {
     res.status(500).send({ message: 'Erro ao atualizar a Grade id: ' + id });
     logger.error(`PUT /grade - ${JSON.stringify(error.message)}`);
@@ -63,7 +88,15 @@ const remove = async (req, res) => {
   const id = req.params.id;
 
   try {
-    logger.info(`DELETE /grade - ${id}`);
+    let msg = `DELETE /grade - ${id}`;
+    let status = 200;
+    const gradeExc = await gradeModel.findByIdAndDelete({ _id: id });
+    if (gradeExc === null) {
+      msg = `DELETE /grade - nao encontrado ${id}`;
+      status = 404;
+    }
+    logger.info(msg);
+    res.status(status).send({ message: msg });
   } catch (error) {
     res
       .status(500)
@@ -74,7 +107,15 @@ const remove = async (req, res) => {
 
 const removeAll = async (req, res) => {
   try {
-    logger.info(`DELETE /grade`);
+    let msg = `DELETE /grade`;
+    let status = 200;
+    const gradeAll = await gradeModel.deleteMany();
+    if (gradeAll === null) {
+      msg = `DELETE /grade - nenhum dados para ser excluido`;
+      status = 404;
+    }
+    logger.info(msg);
+    res.status(status).send({ message: msg });
   } catch (error) {
     res.status(500).send({ message: 'Erro ao excluir todos as Grades' });
     logger.error(`DELETE /grade - ${JSON.stringify(error.message)}`);
